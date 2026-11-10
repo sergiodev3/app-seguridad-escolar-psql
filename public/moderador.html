@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panel del moderador · Seguridad Escolar</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+  <header><h1>Panel del moderador</h1><a href="inicio.html" style="color:#fff">Inicio</a></header>
+  <main>
+    <p id="mensaje" class="mensaje oculto"></p>
+
+    <h2>Alertas de hoy</h2>
+    <div id="mapa" style="height:40vh"></div>
+    <div id="lista-alertas"></div>
+
+    <h2>Reportes pendientes</h2>
+    <div id="lista-reportes"></div>
+
+    <h2>Teléfono de la policía municipal</h2>
+    <form id="form-policia">
+      <label for="telefono">Número que marca el botón de alerta (10 dígitos)</label>
+      <input id="telefono" name="telefono" type="tel" inputmode="numeric" pattern="\d{10}" maxlength="10" required>
+      <button type="submit">Guardar</button>
+    </form>
+  </main>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module" src="js/moderador.js"></script>
+</body>
+</html>

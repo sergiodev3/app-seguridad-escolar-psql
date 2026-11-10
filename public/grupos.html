@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Caminemos juntos · Seguridad Escolar</title>
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+  <header><h1>Caminemos juntos</h1><a href="inicio.html" style="color:#fff">Inicio</a></header>
+  <main>
+    <p>Grupos de hoy para llegar o salir acompañados. Solo se muestra nombre y grupo de cada integrante.</p>
+    <p id="mensaje" class="mensaje oculto"></p>
+    <div id="lista-grupos">Cargando...</div>
+
+    <h2>Crear un grupo</h2>
+    <form id="form-grupo">
+      <label for="puntoId">Punto de encuentro</label>
+      <select id="puntoId" name="puntoId" required>
+        <option value="">Elige un punto</option>
+      </select>
+      <label for="ruta">Ruta (colonia o calle hacia donde van)</label>
+      <input id="ruta" name="ruta" required maxlength="100">
+      <label for="franja">Horario</label>
+      <select id="franja" name="franja" required>
+        <option value="entrada">Entrada</option>
+        <option value="salida">Salida</option>
+      </select>
+      <label for="cupo">Cupo (2 a 10 personas)</label>
+      <input id="cupo" name="cupo" type="number" min="2" max="10" value="4" required>
+      <button type="submit">Crear grupo</button>
+    </form>
+  </main>
+  <script type="module" src="js/grupos.js"></script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inicio · Seguridad Escolar</title>
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+  <header><h1 id="saludo">Hola</h1><button id="salir" class="secundario" style="width:auto">Salir</button></header>
+  <main>
+    <button id="boton-alerta" type="button">
+      MANTÉN PRESIONADO 2 s<br>PARA LLAMAR A LA POLICÍA
+      <span class="progreso"></span>
+    </button>
+    <p id="estado-alerta" class="mensaje oculto"></p>
+    <p><a id="enlace-911" href="tel:911">¿No contestan? Llamar al 911</a></p>
+    <button id="avisar-contacto" class="secundario" type="button">Avisar a mi contacto por WhatsApp</button>
+
+    <nav class="menu">
+      <a href="reportar.html">Reportar incidente</a>
+      <a href="mapa.html">Mapa de zonas</a>
+      <a href="grupos.html">Caminemos juntos</a>
+      <a href="perfil.html">Mis contactos</a>
+      <a id="enlace-moderador" href="moderador.html" class="oculto">Panel del moderador</a>
+    </nav>
+  </main>
+  <script type="module">
+    import { protegerPagina, cerrarSesion } from './js/sesion.js';
+    import { iniciarAlerta } from './js/alerta.js';
+
+    const usuario = protegerPagina();
+    document.querySelector('#saludo').textContent = `Hola, ${usuario.nombre}`;
+    document.querySelector('#salir').addEventListener('click', cerrarSesion);
+    // Solo mostramos el enlace; la protección real es soloRol('moderador') en el servidor
+    if (usuario.rol === 'moderador') document.querySelector('#enlace-moderador').classList.remove('oculto');
+    iniciarAlerta();
+  </script>
+</body>
+</html>

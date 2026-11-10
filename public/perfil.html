@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mis contactos · Seguridad Escolar</title>
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+  <header><h1>Mi perfil</h1><a href="inicio.html" style="color:#fff">Inicio</a></header>
+  <main>
+    <section class="tarjeta" id="datos-usuario">Cargando...</section>
+
+    <h2>Contactos de confianza</h2>
+    <p>Puedes registrar hasta 2. Se usan para avisarles por WhatsApp en una emergencia.</p>
+    <div id="lista-contactos"></div>
+
+    <form id="form-contacto">
+      <label for="nombre">Nombre del contacto</label>
+      <input id="nombre" name="nombre" required>
+      <label for="telefono">Teléfono (10 dígitos)</label>
+      <input id="telefono" name="telefono" type="tel" inputmode="numeric" pattern="\d{10}" maxlength="10" required>
+      <button type="submit">Agregar contacto</button>
+    </form>
+    <p id="mensaje" class="mensaje oculto"></p>
+  </main>
+  <script type="module" src="js/perfil.js"></script>
+</body>
+</html>

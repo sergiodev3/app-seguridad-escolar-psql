@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reportar incidente · Seguridad Escolar</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+  <header><h1>Reportar incidente</h1><a href="inicio.html" style="color:#fff">Inicio</a></header>
+  <main>
+    <form id="form-reporte">
+      <label for="tipo">¿Qué pasó?</label>
+      <select id="tipo" name="tipo" required>
+        <option value="">Elige una opción</option>
+        <option value="asalto">Asalto</option>
+        <option value="agresion">Agresión</option>
+        <option value="acoso">Acoso</option>
+        <option value="sospechoso">Persona sospechosa</option>
+        <option value="otro">Otro</option>
+      </select>
+      <label for="descripcion">Describe brevemente (sin nombres de personas)</label>
+      <textarea id="descripcion" name="descripcion" rows="3" required></textarea>
+      <label for="fecha">Fecha</label>
+      <input id="fecha" name="fecha" type="date" required>
+      <label for="franja">Horario</label>
+      <select id="franja" name="franja" required>
+        <option value="entrada">Entrada</option>
+        <option value="salida">Salida</option>
+        <option value="otra">Otro horario</option>
+      </select>
+      <label>¿Dónde fue? Toca el mapa o usa tu ubicación</label>
+      <button id="usar-gps" class="secundario" type="button">Usar mi ubicación</button>
+      <div id="mapa" style="height:40vh"></div>
+      <label><input name="anonimo" type="checkbox" style="width:auto"> Enviar de forma anónima</label>
+      <button type="submit">Enviar reporte</button>
+      <p id="mensaje" class="mensaje oculto"></p>
+    </form>
+  </main>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module" src="js/reportar.js"></script>
+</body>
+</html>
