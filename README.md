@@ -64,6 +64,7 @@ El backend sigue el patrón **Rutas → Middlewares → Controladores → Modelo
 | Vista | `public/` | Páginas HTML y su JavaScript |
 
 ```mermaid
+%%{init: {"flowchart": {"htmlLabels": false}}}%%
 flowchart LR
     subgraph Navegador
         V["Páginas HTML<br/>public/*.html"] --> JS["public/js/api.js<br/>fetch + token"]
@@ -212,6 +213,7 @@ La columna `usuarios.rol` solo admite dos valores (`CHECK (rol IN ('alumno','mod
 El moderador también tiene sesión, así que puede usar todo lo que usa un alumno **más** sus funciones propias. Las rutas exclusivas están protegidas en el servidor con `soloRol('moderador')`, y la página `moderador.html` con `protegerPagina('moderador')`.
 
 ```mermaid
+%%{init: {"flowchart": {"htmlLabels": false}}}%%
 flowchart LR
     AL(["👤 Alumno"])
     MO(["🛡️ Moderador"])
@@ -281,6 +283,7 @@ stateDiagram-v2
 Vista: `reportar.html` + `public/js/reportar.js`. Servidor: `reportes.controller.js → crear`.
 
 ```mermaid
+%%{init: {"flowchart": {"htmlLabels": false}}}%%
 flowchart TD
     A([El alumno abre reportar.html]) --> S{¿Tiene sesión?}
     S -- No --> LOG([Redirige a index.html])
@@ -310,6 +313,7 @@ flowchart TD
 Vista: `moderador.html` + `public/js/moderador.js`. Servidor: `reportes.controller.js → pendientes / moderar`.
 
 ```mermaid
+%%{init: {"flowchart": {"htmlLabels": false}}}%%
 flowchart TD
     A([El moderador abre moderador.html]) --> R{¿Rol moderador?}
     R -- No --> IN([Redirige a inicio.html])
@@ -335,6 +339,7 @@ flowchart TD
 Vista: `inicio.html` + `public/js/alerta.js`. Servidor: `alertas.controller.js`.
 
 ```mermaid
+%%{init: {"flowchart": {"htmlLabels": false}}}%%
 flowchart TD
     I([El alumno abre inicio.html]) --> TEL["GET /api/config/policia<br/>(obtiene el teléfono)"]
     TEL --> B([Presiona el botón de alerta])
@@ -362,6 +367,7 @@ Vista: `grupos.html` + `public/js/grupos.js`. Servidor: `grupos.controller.js �
 `grupo.model.js` usa `BEGIN ... FOR UPDATE ... COMMIT` para que, si dos alumnos se unen al mismo tiempo al último lugar, solo entre uno.
 
 ```mermaid
+%%{init: {"flowchart": {"htmlLabels": false}}}%%
 flowchart TD
     V([El alumno abre grupos.html]) --> LG["GET /api/grupos<br/>(solo los de hoy, RN-12)"]
     LG --> BT{"¿Qué botón<br/>ve en la tarjeta?"}
@@ -487,6 +493,7 @@ seguridad-escolar/
 Orden recomendado para escribir la app desde cero. Cada paso se apoya en el anterior y termina con una forma de **comprobar** que funciona antes de avanzar.
 
 ```mermaid
+%%{init: {"flowchart": {"htmlLabels": false}}}%%
 flowchart LR
     F1["1. Proyecto<br/>y entorno"] --> F2["2. Base<br/>de datos"] --> F3["3. Servidor"] --> F4["4. Usuarios<br/>y seguridad"] --> F5["5. Vista<br/>base"] --> F6["6. Módulo 1<br/>Reportes"] --> F7["7. Módulo 2<br/>Alerta"] --> F8["8. Módulo 3<br/>Grupos"] --> F9["9. Despliegue"]
 ```
