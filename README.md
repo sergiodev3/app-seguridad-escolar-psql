@@ -202,6 +202,60 @@ erDiagram
 
 ---
 
+## Usuarios y roles
+
+La columna `usuarios.rol` solo admite dos valores (`CHECK (rol IN ('alumno','moderador'))`):
+
+- **Alumno**: se crea desde `registro.html` con el código del plantel (RN-01). Todo registro nace como `alumno`.
+- **Moderador**: no se registra desde la app; `src/db/init.js` crea la cuenta inicial (`moderador` / `moderador123`, cámbiala en producción).
+
+El moderador también tiene sesión, así que puede usar todo lo que usa un alumno **más** sus funciones propias. Las rutas exclusivas están protegidas en el servidor con `soloRol('moderador')`, y la página `moderador.html` con `protegerPagina('moderador')`.
+
+```mermaid
+flowchart LR
+    AL(["👤 Alumno"])
+    MO(["🛡️ Moderador"])
+
+    subgraph SES["Cualquier usuario con sesión (verificarToken)"]
+        direction TB
+        S1["Ver su perfil y<br/>gestionar contactos (máx. 2)"]
+        S2["Crear reportes<br/>(opcionalmente anónimos)"]
+        S3["Ver el mapa de<br/>reportes aprobados"]
+        S4["Activar el botón de alerta<br/>y llamar a la policía"]
+        S5["Crear, unirse o salir de<br/>grupos de Caminemos juntos"]
+    end
+
+    subgraph MOD["Solo moderador (soloRol('moderador'))"]
+        direction TB
+        M1["Revisar reportes pendientes<br/>y aprobar o rechazar"]
+        M2["Ver alertas de hoy y<br/>marcarlas como atendidas"]
+        M3["Cambiar el teléfono<br/>de la policía"]
+    end
+
+    AL --> SES
+    MO --> SES
+    MO --> MOD
+```
+
+| Acción | Alumno | Moderador | Ruta |
+| --- | :---: | :---: | --- |
+| Registrarse en la app | ✅ | ❌ (lo crea `init.js`) | `POST /api/auth/registro` |
+| Iniciar sesión y ver sus datos | ✅ | ✅ | `/api/auth/login`, `/api/auth/yo` |
+| Gestionar contactos de confianza | ✅ | ✅ | `/api/contactos` |
+| Crear un reporte | ✅ | ✅ | `POST /api/reportes` |
+| Ver el mapa de reportes aprobados | ✅ | ✅ | `GET /api/reportes` |
+| Aprobar o rechazar reportes | ❌ | ✅ | `/api/reportes/pendientes`, `PATCH /api/reportes/:id` |
+| Enviar una alerta | ✅ | ✅ | `POST /api/alertas` |
+| Ver y atender alertas | ❌ | ✅ | `GET /api/alertas`, `PATCH /api/alertas/:id` |
+| Consultar el teléfono de la policía | ✅ | ✅ | `GET /api/config/policia` |
+| Cambiar el teléfono de la policía | ❌ | ✅ | `PUT /api/config/policia` |
+| Crear, unirse o salir de grupos | ✅ | ✅ | `/api/grupos`, `/api/puntos` |
+| Entrar a `moderador.html` | ❌ (redirige a `inicio.html`) | ✅ | — |
+
+> Aunque el moderador apruebe reportes, en un reporte anónimo **nunca** ve al autor (RN-07).
+
+---
+
 ## Módulos
 
 | Módulo | Qué hace | Pantallas | API |
