@@ -276,33 +276,108 @@ stateDiagram-v2
     rechazado --> [*]: nunca se publica
 ```
 
-### Flujo del botón de alerta
+### Reportar un incidente
+
+Vista: `reportar.html` + `public/js/reportar.js`. Servidor: `reportes.controller.js → crear`.
 
 ```mermaid
 flowchart TD
-    I([El alumno presiona el botón]) --> T{¿Lo mantiene<br/>2 segundos?}
-    T -- "No, lo soltó" --> X([Se cancela, RN-08])
+    A([El alumno abre reportar.html]) --> S{¿Tiene sesión?}
+    S -- No --> LOG([Redirige a index.html])
+    S -- Sí --> F["Llena tipo, descripción,<br/>fecha, franja y anónimo"]
+    F --> U{"¿Cómo marca<br/>la ubicación?"}
+    U -- Toca el mapa --> M["Coloca el marcador"]
+    U -- Botón GPS --> G{¿El GPS responde?}
+    G -- Sí --> M
+    G -- No --> AV["Aviso: toca el mapa<br/>para marcarla"] --> U
+    M --> E["Presiona Enviar"]
+    E --> V{¿Hay ubicación<br/>marcada?}
+    V -- No --> EV["Mensaje: marca en el mapa<br/>dónde ocurrió"] --> U
+    V -- Sí --> P["POST /api/reportes"]
+    P --> T{¿Token válido?}
+    T -- No --> E401["401"]
+    T -- Sí --> C{"¿tipo, franja, descripción<br/>y fecha válidos?"}
+    C -- No --> E400a["400 Revisa los campos"]
+    C -- Sí --> L{"¿lat y lng<br/>son números?"}
+    L -- No --> E400b["400 Falta la ubicación"]
+    L -- Sí --> I["INSERT en reportes<br/>estado = pendiente (RN-04)"]
+    I --> OK(["201 → Gracias, un moderador<br/>lo revisará antes del mapa"])
+    E400a & E400b & E401 --> ERR(["Se muestra el error<br/>en el formulario"])
+```
+
+### Moderar un reporte
+
+Vista: `moderador.html` + `public/js/moderador.js`. Servidor: `reportes.controller.js → pendientes / moderar`.
+
+```mermaid
+flowchart TD
+    A([El moderador abre moderador.html]) --> R{¿Rol moderador?}
+    R -- No --> IN([Redirige a inicio.html])
+    R -- Sí --> P["GET /api/reportes/pendientes<br/>(soloRol)"]
+    P --> AN{¿El reporte<br/>es anónimo?}
+    AN -- Sí --> SN["Se muestra SIN autor (RN-07)"]
+    AN -- No --> CN["Se muestra con nombre<br/>y grupo escolar"]
+    SN & CN --> D{"Decisión del<br/>moderador"}
+    D -- Aprobar --> PA["PATCH /api/reportes/:id<br/>{ estado: aprobado }"]
+    D -- Rechazar --> PR["PATCH /api/reportes/:id<br/>{ estado: rechazado }"]
+    PA & PR --> V{"¿estado válido?"}
+    V -- No --> E400["400"]
+    V -- Sí --> X{¿Existe el reporte?}
+    X -- No --> E404["404 Reporte no encontrado"]
+    X -- Sí --> UP["UPDATE estado y moderado_por"]
+    UP --> Q{¿Aprobado?}
+    Q -- Sí --> MAP(["Aparece en el mapa con<br/>coordenadas redondeadas (RN-05, RN-06)"])
+    Q -- No --> NO(["Nunca se publica"])
+```
+
+### Botón de alerta
+
+Vista: `inicio.html` + `public/js/alerta.js`. Servidor: `alertas.controller.js`.
+
+```mermaid
+flowchart TD
+    I([El alumno abre inicio.html]) --> TEL["GET /api/config/policia<br/>(obtiene el teléfono)"]
+    TEL --> B([Presiona el botón de alerta])
+    B --> T{"¿Lo mantiene<br/>2 segundos?"}
+    T -- "No, lo soltó o deslizó<br/>el dedo fuera" --> X([Se cancela, RN-08])
     T -- Sí --> U["Pide la ubicación<br/>(máximo 4 s de espera)"]
-    U --> P["POST /api/alertas<br/>(si falla, no detiene la llamada)"]
-    P --> L["Abre tel: con el número<br/>de la policía municipal"]
-    P --> MOD["La alerta aparece en el<br/>panel del moderador"]
-    MOD --> AT([El moderador la marca como atendida])
+    U --> UB{¿Hay permiso<br/>y señal?}
+    UB -- Sí --> CON["Con lat y lng"]
+    UB -- No --> SIN["Sin ubicación"]
+    CON & SIN --> P["POST /api/alertas<br/>(si falla, no detiene la llamada)"]
+    CON & SIN --> L(["Abre tel: con el número<br/>de la policía municipal"])
+    P --> MOD["La alerta aparece en el<br/>panel del moderador (alertas de hoy)"]
+    MOD --> AT(["El moderador la marca como atendida<br/>PATCH /api/alertas/:id"])
+
+    I --> W([Presiona Avisar a mi contacto])
+    W --> C{¿Tiene un contacto<br/>registrado?}
+    C -- No --> AV(["Aviso: primero agrega un contacto"])
+    C -- Sí --> WA(["Abre WhatsApp con el mensaje<br/>y la liga de ubicación si la hay"])
 ```
 
 ### Unirse a un grupo (transacción)
+
+Vista: `grupos.html` + `public/js/grupos.js`. Servidor: `grupos.controller.js → unirse` y `grupo.model.js`.
 
 `grupo.model.js` usa `BEGIN ... FOR UPDATE ... COMMIT` para que, si dos alumnos se unen al mismo tiempo al último lugar, solo entre uno.
 
 ```mermaid
 flowchart TD
-    A([POST /api/grupos/:id/unirse]) --> B["BEGIN<br/>SELECT cupo ... FOR UPDATE"]
+    V([El alumno abre grupos.html]) --> LG["GET /api/grupos<br/>(solo los de hoy, RN-12)"]
+    LG --> BT{"¿Qué botón<br/>ve en la tarjeta?"}
+    BT -- Ya es integrante --> SAL(["Salir del grupo<br/>DELETE /api/grupos/:id/unirse"])
+    BT -- Grupo lleno --> NB(["Sin botón"])
+    BT -- Hay lugar --> A["Unirme<br/>POST /api/grupos/:id/unirse"]
+    A --> B["BEGIN<br/>SELECT cupo ... FOR UPDATE"]
     B --> C{¿Existe y es de hoy?}
-    C -- No --> E1["ROLLBACK → 404"]
+    C -- No --> E1["ROLLBACK → 404<br/>no existe o ya caducó"]
     C -- Sí --> D{¿Ya es integrante?}
-    D -- Sí --> E2["ROLLBACK → 409"]
+    D -- Sí --> E2["ROLLBACK → 409 (RN-11)"]
     D -- No --> F{¿Hay cupo?}
-    F -- No --> E3["ROLLBACK → 409 lleno"]
+    F -- No --> E3["ROLLBACK → 409 lleno (RN-10)"]
     F -- Sí --> G["INSERT integrante<br/>COMMIT → 201"]
+    G --> OK(["Te uniste al grupo:<br/>se recarga la lista"])
+    E1 & E2 & E3 --> ERR(["Se muestra el error<br/>y se recarga la lista"])
 ```
 
 ---
