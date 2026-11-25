@@ -565,6 +565,113 @@ seguridad-escolar/
 
 ---
 
+## Despliegue
+
+En local, Express sirve las páginas **y** la API desde el mismo lugar (`http://localhost:3000`). En producción se separan: la **vista** vive en Vercel y la **API con la base de datos** vive en Railway.
+
+### Qué vive en cada plataforma
+
+```mermaid
+%%{init: {"flowchart": {"htmlLabels": false}}}%%
+flowchart LR
+    U["Celular o PC<br/>del alumno"]
+
+    subgraph Vercel["Vercel (sitio estático)"]
+        P["public/<br/>*.html, css/, js/"]
+    end
+
+    subgraph Railway["Railway"]
+        API["Servicio Node<br/>npm start → server.js"]
+        DB[("Servicio PostgreSQL")]
+    end
+
+    U -- "1. abre la página" --> P
+    P -- "2. descarga HTML, CSS y JS" --> U
+    U -- "3. fetch a API_URL<br/>(HTTPS + JSON + token)" --> API
+    API -- "DATABASE_URL" --> DB
+```
+
+| Plataforma | Qué publica | Cómo se configura |
+| --- | --- | --- |
+| **Vercel** | Solo la carpeta `public/` (HTML, CSS, JS). No ejecuta Node | `public/js/config.js` detecta `.vercel.app` y usa la URL de Railway |
+| **Railway** | La API (`server.js`, `src/`) y la base de datos PostgreSQL | Variables de entorno del servicio; arranca con `npm start` |
+
+El único punto que une ambas partes es `API_URL` en `public/js/config.js`:
+
+```js
+const EN_VERCEL = location.hostname.endsWith('.vercel.app');
+
+export const API_URL = EN_VERCEL
+  ? 'https://CAMBIAR-POR-SU-API.up.railway.app/api'   // dominio que da Railway
+  : '/api';                                          // local: mismo servidor
+```
+
+### Variables de entorno en producción
+
+Se capturan en el panel de **Railway** (servicio de la API). Vercel no necesita variables: solo sirve archivos estáticos.
+
+| Variable | Dónde | Valor | Nota |
+| --- | --- | --- | --- |
+| `DATABASE_URL` | Railway | La que genera el servicio PostgreSQL de Railway | Secreta. Se enlaza desde el servicio de la base de datos |
+| `JWT_SECRETO` | Railway | Frase larga y aleatoria, distinta a la de local | Secreta. Si se filtra, cualquiera puede fabricar tokens |
+| `CODIGO_REGISTRO` | Railway | Código que el docente da al grupo | Semisecreta: solo la conoce el grupo |
+| `TELEFONO_POLICIA` | Railway | Número del botón de alerta | Valor inicial; el moderador lo cambia desde la app |
+| `FRONTEND_URL` | Railway | `https://<su-app>.vercel.app` | Orígenes permitidos por CORS, separados por coma |
+| `PORT` | Railway (automática) | La asigna Railway | No se captura. `server.js` la lee antes que `PUERTO` |
+
+> `PUERTO` solo se usa en local. Los valores reales **nunca** se escriben en el README ni en Git.
+
+### CORS
+
+**Qué es.** Por seguridad, el navegador bloquea que una página llame con `fetch` a un **origen distinto** al suyo (otro dominio, puerto o protocolo), a menos que el servidor responda que ese origen está permitido. A esa regla se le llama CORS (*Cross-Origin Resource Sharing*).
+
+**Por qué aparece en este proyecto.** En local no hay problema: página y API comparten `http://localhost:3000`. En producción son dos orígenes distintos:
+
+| Parte | Origen |
+| --- | --- |
+| Vista | `https://<su-app>.vercel.app` |
+| API | `https://<su-api>.up.railway.app` |
+
+**Analogía.** Un edificio con recepción: la recepcionista (navegador) solo deja pasar a un visitante (la página de Vercel) si el departamento al que va (la API) lo tiene en su lista de invitados (`FRONTEND_URL`).
+
+**Cómo se configuró.** En `server.js`, con el middleware `cors`:
+
+```js
+const origenes = (process.env.FRONTEND_URL ?? 'http://localhost:3000').split(',').map((o) => o.trim());
+app.use(cors({ origin: origenes }));
+```
+
+Como las peticiones llevan `Authorization: Bearer ...` y `Content-Type: application/json`, el navegador primero manda una petición de prueba (`OPTIONS`, llamada *preflight*):
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant N as Navegador<br/>(página en Vercel)
+    participant API as API en Railway
+
+    N->>API: OPTIONS /api/reportes<br/>Origin: https://su-app.vercel.app
+    alt el origen está en FRONTEND_URL
+        API-->>N: 204 + Access-Control-Allow-Origin
+        N->>API: GET /api/reportes<br/>Authorization: Bearer token
+        API-->>N: 200 [reportes]
+    else el origen no está
+        API-->>N: respuesta sin Access-Control-Allow-Origin
+        N->>N: bloquea la respuesta<br/>(error de CORS en la consola)
+    end
+```
+
+**Errores comunes.**
+
+| Síntoma en DevTools | Causa | Solución |
+| --- | --- | --- |
+| `blocked by CORS policy` | `FRONTEND_URL` no tiene la URL de Vercel | Agregarla en Railway y redesplegar |
+| Funciona en un dominio de Vercel y en otro no | Vercel da varias URL (producción y vistas previas) | Agregar todas, separadas por coma |
+| Sigue fallando con la URL "correcta" | Barra final (`.../`) o `http` en vez de `https` | El origen debe coincidir exacto: `https://su-app.vercel.app` |
+
+> CORS lo aplica **el navegador**, no el servidor. Herramientas como Postman o `curl` lo ignoran, así que **no** sustituye a `verificarToken` ni a `soloRol`: protege al usuario, no a la API.
+
+---
+
 ## Guía de desarrollo paso a paso
 
 Orden recomendado para escribir la app desde cero. Cada paso se apoya en el anterior y termina con una forma de **comprobar** que funciona antes de avanzar.
