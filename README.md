@@ -766,10 +766,136 @@ flowchart LR
 
 ---
 
-## Seguridad: puntos para revisar en clase
+## Seguridad y privacidad
 
-- **Contraseñas:** se guardan con `bcrypt`. Ni el docente puede leerlas desde pgAdmin.
+La app guarda datos de menores: nombres, matrículas, ubicaciones e incidentes. Por eso la seguridad no es un extra, es parte del diseño desde la base de datos.
+
+### Contraseñas: se guarda un hash, nunca la contraseña
+
+**Qué es.** Un *hash* es el resultado de pasar la contraseña por una función de **un solo sentido**: de `micontraseña` se obtiene `$2b$10$Xk...`, pero del hash no se puede regresar a la contraseña. `bcrypt` además agrega una **sal** (texto aleatorio) a cada contraseña, así dos alumnos con la misma contraseña tienen hashes distintos.
+
+**Analogía.** Una licuadora: de una fresa sale un licuado, pero del licuado no puedes reconstruir la fresa. Para comprobar que alguien trae la misma fresa, la licúas otra vez y comparas los licuados.
+
+**En el proyecto** (`src/controllers/auth.controller.js`):
+
+```js
+// Registro: se guarda solo el hash (10 = costo; más alto, más lento de atacar)
+const passwordHash = bcrypt.hashSync(password, 10);
+
+// Login: se vuelve a calcular y se compara; la contraseña original nunca se guarda
+bcrypt.compareSync(password, usuario.password_hash)
+```
+
+- En la tabla `usuarios` solo existe la columna `password_hash`. Ni el docente puede leer las contraseñas desde pgAdmin.
+- El login responde **el mismo mensaje** si la matrícula no existe o si la contraseña está mal (`Matrícula o contraseña incorrectas`). Así nadie puede averiguar qué matrículas están registradas.
+- Mínimo 8 caracteres (RN-03).
+
+### JWT: la credencial de la sesión
+
+**Qué es.** Un *JSON Web Token* es un texto con tres partes separadas por puntos: `encabezado.carga.firma`. La **carga** lleva quién es el usuario; la **firma** se calcula con `JWT_SECRETO`, que solo conoce el servidor. Si alguien cambia la carga (por ejemplo `"rol": "moderador"`), la firma ya no coincide y el token se rechaza.
+
+**Analogía.** Una pulsera de un evento: te la ponen en la entrada (login) y después solo la muestras en cada puerta. El guardia no vuelve a pedirte el boleto, solo revisa que la pulsera sea original y no esté vencida.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant N as Navegador
+    participant API as Express
+    participant MW as verificarToken
+
+    N->>API: POST /api/auth/login (matrícula + contraseña)
+    API->>API: bcrypt.compareSync()
+    API->>API: jwt.sign({ id, rol, nombre }, JWT_SECRETO, 8h)
+    API-->>N: { token }
+    N->>N: localStorage.setItem('token')
+
+    N->>API: GET /api/contactos<br/>Authorization: Bearer token
+    API->>MW: jwt.verify(token, JWT_SECRETO)
+    alt firma válida y no vencido
+        MW->>API: req.usuario = { id, rol, nombre }
+        API-->>N: 200
+    else alterado o vencido
+        MW-->>N: 401 → cerrarSesion()
+    end
+```
+
+| Dónde | Qué hace |
+| --- | --- |
+| `auth.controller.js` → `login` | Firma el token con `{ id, rol, nombre }` y caduca en `8h` (una jornada) |
+| `public/js/sesion.js` | Lo guarda en `localStorage` |
+| `public/js/api.js` | Lo manda en cada petición: `Authorization: Bearer <token>` |
+| `src/middlewares/auth.js` → `verificarToken` | Lo verifica y llena `req.usuario` |
+
+> El JWT está **firmado, no cifrado**: cualquiera puede leer su carga pegándolo en jwt.io. Por eso solo lleva `id`, `rol` y `nombre`, nunca contraseñas ni datos sensibles.
+
+### Roles: autenticación vs. autorización
+
+- **Autenticación**: ¿quién eres? → `verificarToken` (401 si no hay sesión válida).
+- **Autorización**: ¿qué puedes hacer? → `soloRol('moderador')` (403 si no tienes el rol).
+
+El rol sale de `req.usuario.rol`, que viene **del token firmado**, no de algo que mande el navegador. Las rutas exclusivas del moderador:
+
+| Ruta | Archivo |
+| --- | --- |
+| `GET /api/reportes/pendientes`, `PATCH /api/reportes/:id` | `src/routes/reportes.routes.js` |
+| `GET /api/alertas`, `PATCH /api/alertas/:id` | `src/routes/alertas.routes.js` |
+| `PUT /api/config/policia` | `src/routes/config.routes.js` |
+
+> `protegerPagina('moderador')` en `public/js/sesion.js` solo redirige para que la vista sea cómoda. **No protege nada**: cualquiera puede llamar a la API con Postman. La protección real es `soloRol` en el servidor. Ver también [Usuarios y roles](#usuarios-y-roles).
+
+### Secretos en variables de entorno
+
+**Por qué.** El código se sube a GitHub y lo puede leer cualquiera. Si `JWT_SECRETO` estuviera escrito en `server.js`, cualquiera podría **fabricar un token de moderador**. Si `DATABASE_URL` estuviera en el código, cualquiera podría entrar a la base de datos.
+
+**Analogía.** El plano de una casa puede ser público; la llave no. El código es el plano, las variables de entorno son la llave.
+
+| Regla | Cómo se cumple |
+| --- | --- |
+| Los secretos no están en el código | `process.env.JWT_SECRETO`, `process.env.DATABASE_URL` |
+| `.env` nunca se sube | Está en `.gitignore`; solo se sube `.env.example` con valores de ejemplo |
+| Local y producción usan secretos distintos | `.env` en la PC; variables en el panel de Railway |
+| Las cuentas iniciales se cambian | La cuenta `moderador` / `moderador123` de `init.js` se cambia en producción |
+
+> Si un secreto llega a subirse a GitHub, borrarlo en un commit nuevo **no basta**: queda en el historial. Hay que cambiarlo (rotarlo) de inmediato.
+
+Detalle completo de cada variable en [Variables de entorno](#variables-de-entorno) y [Variables de entorno en producción](#variables-de-entorno-en-producción).
+
+### Privacidad: ni ubicaciones exactas ni autores de reportes anónimos
+
+**Por qué.** Un reporte dice "aquí pasó algo". Si el mapa mostrara el punto exacto y el nombre de quien reportó, se podría deducir **dónde vive** o **por dónde camina** un alumno, y la persona agresora podría saber quién la denunció. Eso pone en riesgo justo a quien la app quiere proteger.
+
+**Ubicación redondeada (RN-06).** `src/controllers/reportes.controller.js` redondea las coordenadas públicas a 3 decimales, aproximadamente 100 m:
+
+```js
+const redondear = (n) => Math.round(n * 1000) / 1000;   // 25.686614 → 25.687
+```
+
+El mapa muestra **la zona** de riesgo, que es lo útil para cuidarse, sin señalar una casa en particular.
+
+**Reportes anónimos (RN-07).** Cuando el alumno marca "anónimo", el moderador recibe el reporte **sin** `autor`, `grupo_escolar` ni `usuario_id`:
+
+```js
+// reportes.controller.js → pendientes
+r.anonimo ? r : { ...r, autor, grupo_escolar }
+```
+
+| Quién | Qué ve de un reporte anónimo |
+| --- | --- |
+| Público (mapa) | Tipo, fecha, franja y zona aproximada. Nunca autor ni descripción |
+| Moderador | Tipo, descripción y ubicación para decidir si lo aprueba. Nunca el autor |
+| Base de datos | Guarda `usuario_id` para evitar abuso; solo accesible para quien administra el servidor |
+
+**Otros datos que se cuidan.**
+
+- **Caminemos juntos**: los integrantes se ven solo con nombre y grupo escolar, sin teléfonos (RN-14); el punto de encuentro sale de una lista, nunca un domicilio (RN-13).
+- **Mapa**: solo muestra reportes `aprobados` (RN-05), así un reporte falso no aparece hasta que el moderador lo revisa.
+
+### Resumen para revisar en clase
+
+- **Contraseñas:** solo hash con `bcrypt`. Ni el docente puede leerlas desde pgAdmin.
+- **Sesión:** JWT firmado con `JWT_SECRETO`, caduca en 8 h; la carga no lleva datos sensibles.
+- **Autorización en el servidor:** ocultar un botón no protege nada. `soloRol('moderador')` sí.
+- **Secretos:** en variables de entorno, nunca en Git.
 - **Inyección SQL:** todas las consultas usan parámetros (`$1`). Nunca se pega texto del usuario en el SQL.
 - **XSS:** la vista pinta los datos del usuario con `textContent` y nunca con `innerHTML`.
-- **Autorización en el servidor:** ocultar un botón no protege nada. `soloRol('moderador')` sí.
-- **Privacidad:** coordenadas redondeadas, reportes anónimos y grupos sin teléfonos.
+- **Privacidad:** coordenadas redondeadas, reportes anónimos sin autor y grupos sin teléfonos.
