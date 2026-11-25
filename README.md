@@ -120,6 +120,83 @@ sequenceDiagram
 
 ---
 
+## Patrones de diseño
+
+Un patrón de diseño es una solución probada a un problema que se repite. No es código para copiar, sino una forma de organizarlo. Estos son los cuatro que aparecen en el proyecto.
+
+| Patrón | Idea en una línea | Dónde está |
+| --- | --- | --- |
+| MVC / arquitectura en capas | Cada capa hace una sola cosa | `src/routes`, `src/controllers`, `src/models`, `public/` |
+| Middleware (cadena de responsabilidad) | La petición pasa por filtros en fila | `server.js`, `src/middlewares/auth.js` |
+| Observer (eventos) | "Avísame cuando pase algo" | `public/js/*.js` |
+| Repositorio (modelos) | Un solo lugar habla con la base de datos | `src/models/*.model.js` |
+
+### MVC / arquitectura en capas
+
+**Qué es.** Separa la aplicación en capas con responsabilidades distintas: la **Vista** muestra datos, el **Controlador** decide qué hacer con la petición y el **Modelo** obtiene o guarda los datos. Una capa solo habla con la de al lado.
+
+**Analogía.** Un restaurante: el mesero (ruta) toma el pedido, el chef (controlador) decide cómo prepararlo y el almacenista (modelo) trae los ingredientes de la bodega (base de datos). El cliente nunca entra a la bodega.
+
+**En el proyecto.**
+
+| Capa | Archivo de ejemplo |
+| --- | --- |
+| Vista | `public/reportar.html` + `public/js/reportar.js` |
+| Ruta | `src/routes/reportes.routes.js` |
+| Controlador | `src/controllers/reportes.controller.js` (valida tipo, franja y ubicación; redondea coordenadas) |
+| Modelo | `src/models/reporte.model.js` (solo SQL) |
+
+> Variante del MVC clásico: aquí el controlador no genera HTML, responde **JSON**. La vista es independiente (`public/`) y pide los datos con `fetch` desde `public/js/api.js`.
+
+### Middleware (cadena de responsabilidad)
+
+**Qué es.** Una petición pasa por una **fila de funciones**. Cada una puede atenderla y responder, o llamar a `next()` para pasarla a la siguiente. Así se agregan filtros sin tocar el controlador.
+
+**Analogía.** Los filtros para entrar a un concierto: primero revisan tu boleto, luego tu credencial de acceso VIP. Si fallas en uno, no llegas al siguiente.
+
+**En el proyecto.**
+
+- `src/middlewares/auth.js`: `verificarToken` (¿trae token válido? → 401) y `soloRol(...)` (¿tiene el rol? → 403).
+- `src/routes/reportes.routes.js`: `router.patch('/:id', soloRol('moderador'), C.moderar)` encadena el filtro antes del controlador.
+- `server.js`: `express.json()` y `cors()` al inicio, y el **middleware de errores** (4 parámetros) al final de la cadena.
+
+```text
+Petición → cors → express.json → verificarToken → soloRol → controlador
+                                                              ↓ (error)
+                                                   middleware de errores
+```
+
+### Observer (eventos)
+
+**Qué es.** Un objeto (el sujeto) avisa a quienes se **suscribieron** cuando ocurre algo. Los suscriptores no preguntan cada segundo "¿ya pasó?"; esperan el aviso.
+
+**Analogía.** Suscribirte a un canal de YouTube: no revisas el canal todo el día, la plataforma te notifica cuando hay un video nuevo.
+
+**En el proyecto** (lado del navegador):
+
+- `public/js/alerta.js`: el botón de alerta escucha `pointerdown`, `pointerup` y `pointerleave` para saber si se mantuvo presionado 2 segundos.
+- `public/js/reportar.js`: `mapa.on('click', ...)` (Leaflet) marca la ubicación al tocar el mapa; el formulario escucha `submit`.
+- `public/js/mapa.js`: `filtros.addEventListener('change', pintarZonas)` vuelve a pintar las zonas al cambiar un filtro.
+- También en `grupos.js`, `moderador.js` y `perfil.js`.
+
+> En el servidor no se usa `EventEmitter`; el patrón Observer aparece en la vista.
+
+### Repositorio (modelos)
+
+**Qué es.** Un módulo que **esconde el acceso a datos** detrás de funciones con nombre de negocio (`crear`, `listarAprobados`). El resto del código no sabe que hay SQL ni qué tablas existen.
+
+**Analogía.** El bibliotecario: le pides "un libro de historia" y te lo trae. No necesitas saber en qué estante ni en qué orden están guardados.
+
+**En el proyecto.**
+
+- `src/models/reporte.model.js`: `crear`, `listarAprobados`, `listarPendientes`, `cambiarEstado`.
+- Lo mismo en `usuario.model.js`, `contacto.model.js`, `alerta.model.js`, `grupo.model.js` y `config.model.js`.
+- Todas usan `pool` de `src/db/conexion.js` y consultas con parámetros (`$1`, `$2`).
+
+El controlador solo llama `Reporte.crear({...})`. Si mañana cambia la base de datos, se reescriben los modelos y los controladores quedan igual.
+
+---
+
 ## Base de datos
 
 Ocho tablas. El esquema completo está en [`src/db/esquema.sql`](src/db/esquema.sql).
